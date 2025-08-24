@@ -21,7 +21,7 @@ stdenv.mkDerivation rec {
     tar -xzf $src -C $out/lib/$pname
 
     # Проверяем наличие иконки и копируем её
-    if [ -f $out/lib/$pname/dist-удусекщт/icon.png ]; then
+    if [ -f $out/lib/$pname/dist-electron/icon.png ]; then
       cp $out/lib/$pname/dist-react/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
     fi
 
