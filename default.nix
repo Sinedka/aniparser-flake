@@ -22,7 +22,7 @@ stdenv.mkDerivation rec {
 
     # Проверяем наличие иконки и копируем её
     if [ -f $out/lib/$pname/dist-electron/icon.png ]; then
-      cp $out/lib/$pname/dist-react/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
+      cp $out/lib/$pname/dist-electron/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
     fi
 
     # Создаём desktop entry
