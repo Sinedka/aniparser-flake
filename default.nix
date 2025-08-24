@@ -2,13 +2,12 @@
 
 stdenv.mkDerivation rec {
   pname = "aniparser";
-  version = "0.3.0";
+  version = "0.3.1";
 
   src = fetchurl {
-    url = "https://github.com/Sinedka/aniparser/releases/download/v0.3.0/dist-electron.tar.gz";
-    sha256 = "sha256-75oRJVRO5SOAacgTo38kWkUS7dCenZyJaDq8TeOz/BY=";
+    url = "https://github.com/Sinedka/aniparser/releases/download/v0.3.1/dist-electron.tar.gz";
+    sha256 = "0fdkn20bga3gchbwx89wzk6vrwrajp3m2k4jzsjh67zhd2xyws8r";
   };
-  
 
   nativeBuildInputs = [ electron ];
 
@@ -22,7 +21,7 @@ stdenv.mkDerivation rec {
     tar -xzf $src -C $out/lib/$pname
 
     # Проверяем наличие иконки и копируем её
-    if [ -f $out/lib/$pname/dist-react/icon.png ]; then
+    if [ -f $out/lib/$pname/dist-удусекщт/icon.png ]; then
       cp $out/lib/$pname/dist-react/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
     fi
 
