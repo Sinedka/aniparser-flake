@@ -22,7 +22,7 @@ stdenv.mkDerivation rec {
     mv $out/lib/dist-full $out/lib/$pname
 
     # Проверяем наличие иконки и копируем её
-    if [ -f $out/lib/$pname/dist-full/icon.png ]; then
+    if [ -f $out/lib/$pname/icon.png ]; then
       cp $out/lib/$pname/dist-full/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
     fi
 
