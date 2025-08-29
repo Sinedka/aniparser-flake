@@ -2,27 +2,28 @@
 
 stdenv.mkDerivation rec {
   pname = "aniparser";
-  version = "0.3.1";
+  version = "0.3.2";
 
   src = fetchurl {
-    url = "https://github.com/Sinedka/aniparser/releases/download/v0.3.1/dist-electron.tar.gz";
+    url = "https://github.com/Sinedka/aniparser/releases/download/v0.3.2/dist-full.tar.gz";
     sha256 = "0fdkn20bga3gchbwx89wzk6vrwrajp3m2k4jzsjh67zhd2xyws8r";
   };
 
   nativeBuildInputs = [ electron ];
 
   installPhase = ''
-    mkdir -p $out/lib/$pname
+    mkdir -p $out/lib
     mkdir -p $out/bin
     mkdir -p $out/share/applications
     mkdir -p $out/share/icons/hicolor/512x512/apps
 
     # Распаковываем архив
-    tar -xzf $src -C $out/lib/$pname
+    tar -xzf $src -C $out/lib/
+    mv dist-full $pname
 
     # Проверяем наличие иконки и копируем её
-    if [ -f $out/lib/$pname/dist-electron/icon.png ]; then
-      cp $out/lib/$pname/dist-electron/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
+    if [ -f $out/lib/$pname/dist-full/icon.png ]; then
+      cp $out/lib/$pname/dist-full/icon.png $out/share/icons/hicolor/512x512/apps/$pname.png
     fi
 
     # Создаём desktop entry
@@ -40,7 +41,7 @@ EOF
     # Скрипт запуска
     cat > $out/bin/$pname <<EOF
 #!/bin/sh
-exec ${electron}/bin/electron $out/lib/$pname/dist-electron/main.js "\$@"
+exec ${electron}/bin/electron $out/lib/$pname
 EOF
     chmod +x $out/bin/$pname
   '';
