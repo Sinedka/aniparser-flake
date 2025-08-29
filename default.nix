@@ -19,7 +19,7 @@ stdenv.mkDerivation rec {
 
     # Распаковываем архив
     tar -xzf $src -C $out/lib/
-    mv dist-full $pname
+    mv $out/lib/dist-full $out/lib/$pname
 
     # Проверяем наличие иконки и копируем её
     if [ -f $out/lib/$pname/dist-full/icon.png ]; then
