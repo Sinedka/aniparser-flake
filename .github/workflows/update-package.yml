@@ -28,13 +28,7 @@ jobs:
           if [ -n "${INPUT_TAG:-}" ]; then
             TAG="$INPUT_TAG"
           else
-            TAG="$(python - <<'PY'
-import json, urllib.request
-url = "https://api.github.com/repos/Sinedka/aniparser/releases/latest"
-with urllib.request.urlopen(url) as r:
-    print(json.load(r)["tag_name"])
-PY
-)"
+            TAG="$(python -c 'import json, urllib.request; url="https://api.github.com/repos/Sinedka/aniparser/releases/latest"; print(json.load(urllib.request.urlopen(url))["tag_name"])')"
           fi
 
           VERSION="${TAG#v}"
