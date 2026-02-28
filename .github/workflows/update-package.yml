@@ -25,22 +25,57 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -n "${INPUT_TAG:-}" ]; then
-            TAG="$INPUT_TAG"
-          else
-            TAG="$(python -c 'import json, urllib.request; url="https://api.github.com/repos/Sinedka/aniparser/releases/latest"; print(json.load(urllib.request.urlopen(url))["tag_name"])')"
-          fi
+          echo "::group::Inputs"
+          echo "INPUT_TAG=${INPUT_TAG:-<empty>}"
+          echo "::endgroup::"
 
+          echo "::group::Resolve tag"
+          TAG="${INPUT_TAG:-}"
+          if [ -z "${TAG}" ]; then
+            echo "Fetching latest tag from GitHub API..."
+            TAG="$(curl -s -H "User-Agent: aniparser-flake" \
+              "https://api.github.com/repos/Sinedka/aniparser/releases/latest" \
+              | python -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')"
+          else
+            echo "Using provided tag: ${TAG}"
+          fi
+          echo "Resolved TAG=${TAG}"
+          echo "::endgroup::"
+
+          echo "::group::Compute version and URL"
           VERSION="${TAG#v}"
           URL="https://github.com/Sinedka/aniparser/releases/download/${TAG}/dist-full.tar.gz"
+          echo "VERSION=${VERSION}"
+          echo "URL=${URL}"
+          echo "::endgroup::"
 
+          echo "::group::Download and hash"
           TMP="$(mktemp)"
+          echo "Downloading to ${TMP}..."
           curl -L "$URL" -o "$TMP"
+          echo "Computing nix sha256..."
           HASH="$(nix hash file --type sha256 --base64 "$TMP")"
+          echo "HASH=${HASH}"
+          echo "::endgroup::"
 
-          export TAG VERSION URL HASH
-          python -c 'import os,re; path="default.nix"; version=os.environ["VERSION"]; url=os.environ["URL"]; sha="sha256-"+os.environ["HASH"]; data=open(path,"r",encoding="utf-8").read(); data=re.sub(r"version\\s*=\\s*\\\".*?\\\";", f"version = \\\"{version}\\\";", data, count=1); data=re.sub(r"url\\s*=\\s*\\\".*?\\\";", f"url = \\\"{url}\\\";", data, count=1); data=re.sub(r"sha256\\s*=\\s*\\\".*?\\\";", f"sha256 = \\\"{sha}\\\";", data, count=1); open(path,"w",encoding="utf-8").write(data)'
+          echo "::group::Update default.nix"
+          export VERSION URL HASH
+          python - <<'PY'
+import os, re
+path = "default.nix"
+version = os.environ["VERSION"]
+url = os.environ["URL"]
+sha = "sha256-" + os.environ["HASH"]
+data = open(path, "r", encoding="utf-8").read()
+data = re.sub(r'version\s*=\s*".*?";', f'version = "{version}";', data, count=1)
+data = re.sub(r'url\s*=\s*".*?";', f'url = "{url}";', data, count=1)
+data = re.sub(r'sha256\s*=\s*".*?";', f'sha256 = "{sha}";', data, count=1)
+open(path, "w", encoding="utf-8").write(data)
+PY
+          echo "Updated default.nix"
+          echo "::endgroup::"
 
+          echo "::group::Git status"
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -50,3 +85,4 @@ jobs:
           else
             echo "No changes to commit."
           fi
+          echo "::endgroup::"
