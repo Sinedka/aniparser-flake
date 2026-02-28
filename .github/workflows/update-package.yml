@@ -1,0 +1,75 @@
+name: Update aniparser package
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.3.3). Leave empty to use latest."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Update default.nix and push
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${INPUT_TAG:-}" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="$(python - <<'PY'
+import json, urllib.request
+url = "https://api.github.com/repos/Sinedka/aniparser/releases/latest"
+with urllib.request.urlopen(url) as r:
+    print(json.load(r)["tag_name"])
+PY
+)"
+          fi
+
+          VERSION="${TAG#v}"
+          URL="https://github.com/Sinedka/aniparser/releases/download/${TAG}/dist-full.tar.gz"
+
+          TMP="$(mktemp)"
+          curl -L "$URL" -o "$TMP"
+          HASH="$(nix hash file --type sha256 --base64 "$TMP")"
+
+          export TAG VERSION URL HASH
+          python - <<'PY'
+import os, re
+path = "default.nix"
+tag = os.environ["TAG"]
+version = os.environ["VERSION"]
+url = os.environ["URL"]
+sha = "sha256-" + os.environ["HASH"]
+
+with open(path, "r", encoding="utf-8") as f:
+    data = f.read()
+
+data = re.sub(r'version\s*=\s*".*?";', f'version = "{version}";', data, count=1)
+data = re.sub(r'url\s*=\s*".*?";', f'url = "{url}";', data, count=1)
+data = re.sub(r'sha256\s*=\s*".*?";', f'sha256 = "{sha}";', data, count=1)
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(data)
+PY
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add default.nix
+            git commit -m "chore: update aniparser to ${VERSION}"
+            git push
+          else
+            echo "No changes to commit."
+          fi
