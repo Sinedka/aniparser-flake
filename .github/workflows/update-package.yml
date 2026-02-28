@@ -39,24 +39,7 @@ jobs:
           HASH="$(nix hash file --type sha256 --base64 "$TMP")"
 
           export TAG VERSION URL HASH
-          python - <<'PY'
-import os, re
-path = "default.nix"
-tag = os.environ["TAG"]
-version = os.environ["VERSION"]
-url = os.environ["URL"]
-sha = "sha256-" + os.environ["HASH"]
-
-with open(path, "r", encoding="utf-8") as f:
-    data = f.read()
-
-data = re.sub(r'version\s*=\s*".*?";', f'version = "{version}";', data, count=1)
-data = re.sub(r'url\s*=\s*".*?";', f'url = "{url}";', data, count=1)
-data = re.sub(r'sha256\s*=\s*".*?";', f'sha256 = "{sha}";', data, count=1)
-
-with open(path, "w", encoding="utf-8") as f:
-    f.write(data)
-PY
+          python -c 'import os,re; path="default.nix"; version=os.environ["VERSION"]; url=os.environ["URL"]; sha="sha256-"+os.environ["HASH"]; data=open(path,"r",encoding="utf-8").read(); data=re.sub(r"version\\s*=\\s*\\\".*?\\\";", f"version = \\\"{version}\\\";", data, count=1); data=re.sub(r"url\\s*=\\s*\\\".*?\\\";", f"url = \\\"{url}\\\";", data, count=1); data=re.sub(r"sha256\\s*=\\s*\\\".*?\\\";", f"sha256 = \\\"{sha}\\\";", data, count=1); open(path,"w",encoding="utf-8").write(data)'
 
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
