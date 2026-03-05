@@ -23,66 +23,38 @@ jobs:
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
-          set -euo pipefail
-
-          echo "::group::Inputs"
-          echo "INPUT_TAG=${INPUT_TAG:-<empty>}"
-          echo "::endgroup::"
-
-          echo "::group::Resolve tag"
-          TAG="${INPUT_TAG:-}"
-          if [ -z "${TAG}" ]; then
-            echo "Fetching latest tag from GitHub API..."
-            TAG="$(curl -s -H "User-Agent: aniparser-flake" \
-              "https://api.github.com/repos/Sinedka/aniparser/releases/latest" \
-              | python -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')"
+          if [ -n "$INPUT_TAG" ]; then
+            latest_tag="$INPUT_TAG"
           else
-            echo "Using provided tag: ${TAG}"
+            latest_tag=$(curl -s https://api.github.com/repos/sinedka/aniparser/releases/latest \
+            | grep '"tag_name":' \
+            | sed -E 's/.*"([^"]+)".*/\1/')
           fi
-          echo "Resolved TAG=${TAG}"
-          echo "::endgroup::"
 
-          echo "::group::Compute version and URL"
-          VERSION="${TAG#v}"
-          URL="https://github.com/Sinedka/aniparser/releases/download/${TAG}/dist-full.tar.gz"
-          echo "VERSION=${VERSION}"
-          echo "URL=${URL}"
-          echo "::endgroup::"
-
-          echo "::group::Download and hash"
-          TMP="$(mktemp)"
-          echo "Downloading to ${TMP}..."
-          curl -L "$URL" -o "$TMP"
-          echo "Computing nix sha256..."
-          HASH="$(nix hash file --type sha256 --base64 "$TMP")"
-          echo "HASH=${HASH}"
-          echo "::endgroup::"
-
-          echo "::group::Update default.nix"
-          export VERSION URL HASH
-          python - <<'PY'
-import os, re
-path = "default.nix"
-version = os.environ["VERSION"]
-url = os.environ["URL"]
-sha = "sha256-" + os.environ["HASH"]
-data = open(path, "r", encoding="utf-8").read()
-data = re.sub(r'version\s*=\s*".*?";', f'version = "{version}";', data, count=1)
-data = re.sub(r'url\s*=\s*".*?";', f'url = "{url}";', data, count=1)
-data = re.sub(r'sha256\s*=\s*".*?";', f'sha256 = "{sha}";', data, count=1)
-open(path, "w", encoding="utf-8").write(data)
-PY
-          echo "Updated default.nix"
-          echo "::endgroup::"
-
-          echo "::group::Git status"
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add default.nix
-            git commit -m "chore: update aniparser to ${VERSION}"
-            git push
-          else
-            echo "No changes to commit."
+          if [ -z "$latest_tag" ]; then
+            echo "Failed to resolve release tag" >&2
+            exit 1
           fi
-          echo "::endgroup::"
+
+          sed -i "s|releases/download/[^/]*/dist-full.tar.gz|releases/download/${latest_tag}/dist-full.tar.gz|" default.nix
+          
+          wget https://github.com/Sinedka/aniparser/releases/download/$latest_tag/dist-full.tar.gz
+
+          HASH=$(openssl dgst -sha256 -binary dist-full.tar.gz | openssl base64 -A)
+
+          sed -i "s|sha256 = \".*\";|sha256 = \"sha256-$HASH\";|" default.nix
+
+          rm -f dist-full.tar.gz
+
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add default.nix
+          git commit -m "Update aniparser to ${latest_tag}"
+          git push
+          
