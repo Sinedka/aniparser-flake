@@ -1,12 +1,17 @@
 name: Update aniparser package
 
 on:
+  # Ручной запуск
   workflow_dispatch:
     inputs:
       tag:
         description: "Release tag (e.g. v0.3.3). Leave empty to use latest."
         required: false
         type: string
+
+  # Запуск из другого репозитория через repository_dispatch
+  repository_dispatch:
+    types: [release_published]
 
 permissions:
   contents: write
@@ -19,29 +24,37 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v16
 
-      - name: Update default.nix and push
+      - name: Resolve tag, update default.nix and push
         env:
           INPUT_TAG: ${{ inputs.tag }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
         run: |
-          if [ -n "$INPUT_TAG" ]; then
-            latest_tag="$INPUT_TAG"
-          else
-            latest_tag=$(curl -s https://api.github.com/repos/sinedka/aniparser/releases/latest \
-            | grep '"tag_name":' \
-            | sed -E 's/.*"([^"]+)".*/\1/')
+          set -euo pipefail
+
+          # 1) Приоритет: repository_dispatch payload
+          # 2) Потом: workflow_dispatch input
+          # 3) Иначе: latest release
+          latest_tag="${DISPATCH_TAG:-}"
+          if [ -z "$latest_tag" ]; then
+            latest_tag="${INPUT_TAG:-}"
           fi
 
           if [ -z "$latest_tag" ]; then
+            latest_tag="$(curl -sS https://api.github.com/repos/sinedka/aniparser/releases/latest | jq -r .tag_name)"
+          fi
+
+          if [ -z "$latest_tag" ] || [ "$latest_tag" = "null" ]; then
             echo "Failed to resolve release tag" >&2
             exit 1
           fi
 
+          echo "Using tag: $latest_tag"
+
           sed -i "s|releases/download/[^/]*/dist-full.tar.gz|releases/download/${latest_tag}/dist-full.tar.gz|" default.nix
           
-          wget https://github.com/Sinedka/aniparser/releases/download/$latest_tag/dist-full.tar.gz
+          wget -q "https://github.com/Sinedka/aniparser/releases/download/${latest_tag}/dist-full.tar.gz"
 
-          HASH=$(openssl dgst -sha256 -binary dist-full.tar.gz | openssl base64 -A)
-
+          HASH="$(openssl dgst -sha256 -binary dist-full.tar.gz | openssl base64 -A)"
           sed -i "s|sha256 = \".*\";|sha256 = \"sha256-$HASH\";|" default.nix
 
           rm -f dist-full.tar.gz
@@ -57,4 +70,3 @@ jobs:
           git add default.nix
           git commit -m "Update aniparser to ${latest_tag}"
           git push
-          
